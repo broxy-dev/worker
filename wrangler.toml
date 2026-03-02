@@ -1,0 +1,18 @@
+name = "broxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Durable Objects绑定
+[[durable_objects.bindings]]
+name = "BROWSER_CONNECTIONS"
+class_name = "BrowserConnection"
+
+# Durable Objects迁移配置（免费版需要使用 new_sqlite_classes）
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BrowserConnection"]
+
+# 环境变量（可选）
+[vars]
+DEFAULT_TIMEOUT = "30000"
+

@@ -1,58 +1,58 @@
 # Broxy Worker
 
-[English](./README.en.md)
+[中文](./README.zh.md)
 
-Broxy 后端服务，基于 Cloudflare Worker + Durable Objects 构建。提供 WebSocket 桥接、REST API 代理和 MCP (Model Context Protocol) 支持，将浏览器能力暴露为可调用的 API 服务。
+Broxy backend service built on Cloudflare Worker + Durable Objects. Provides WebSocket bridging, REST API proxy, and MCP (Model Context Protocol) support to expose browser capabilities as callable API services.
 
-## 功能特性
+## Features
 
-- **WebSocket 桥接** - 与浏览器脚本建立持久连接，实时通信
-- **REST API 代理** - 通过 `/api/{userId}/*` 端点代理请求到浏览器执行
-- **MCP 协议支持** - 实现 MCP JSON-RPC 2.0 协议，支持 AI 工具调用
-- **Durable Objects** - 每个用户独立的连接状态管理，支持长连接和请求等待
+- **WebSocket Bridging** - Establish persistent connections with browser scripts for real-time communication
+- **REST API Proxy** - Proxy requests to browsers via `/api/{userId}/*` endpoint
+- **MCP Protocol Support** - Implements MCP JSON-RPC 2.0 protocol for AI tool calling
+- **Durable Objects** - Per-user connection state management with long-lived connections and request queuing
 
-## 架构
+## Architecture
 
 ```mermaid
 graph TB
-    subgraph Client["客户端"]
-        MCPClient["MCP 客户端<br/>(AI 工具调用)"]
-        APIClient["API 调用方<br/>(HTTP 请求)"]
+    subgraph Client["Clients"]
+        MCPClient["MCP Client<br/>(AI Tool Calling)"]
+        APIClient["API Consumer<br/>(HTTP Request)"]
     end
 
     subgraph Cloudflare["Cloudflare Worker"]
-        Worker["Worker 入口<br/>src/index.js"]
+        Worker["Worker Entry<br/>src/index.js"]
         DO["Durable Object<br/>BrowserConnection"]
-        MCPHandler["MCP 处理器<br/>src/mcpHandler.js"]
+        MCPHandler["MCP Handler<br/>src/mcpHandler.js"]
     end
 
-    subgraph Browser["浏览器"]
-        Ext["浏览器脚本<br/>(ext/)"]
-        Handler["工具处理器"]
+    subgraph Browser["Browser"]
+        Ext["Browser Script<br/>(ext/)"]
+        Handler["Tool Handlers"]
     end
 
     MCPClient -->|"POST /mcp/{userId}"| Worker
     APIClient -->|"GET/POST /api/{userId}/*"| Worker
-    Worker -->|"路由分发"| DO
+    Worker -->|"Route"| DO
     DO -->|"JSON-RPC"| MCPHandler
     DO <-->|"WebSocket"| Ext
-    Ext -->|"执行"| Handler
-    Handler -->|"返回结果"| Ext
-    Ext -->|"响应"| DO
-    DO -->|"返回"| Worker
-    Worker -->|"响应"| MCPClient
-    Worker -->|"响应"| APIClient
+    Ext -->|"Execute"| Handler
+    Handler -->|"Result"| Ext
+    Ext -->|"Response"| DO
+    DO -->|"Return"| Worker
+    Worker -->|"Response"| MCPClient
+    Worker -->|"Response"| APIClient
 ```
 
-## API 端点
+## API Endpoints
 
-### 健康检查
+### Health Check
 
 ```http
 GET /health
 ```
 
-响应示例：
+Response:
 
 ```json
 {
@@ -66,16 +66,16 @@ GET /health
 }
 ```
 
-### WebSocket 连接
+### WebSocket Connection
 
 ```http
 GET /connect?id={userId}
 Upgrade: websocket
 ```
 
-浏览器脚本通过此端点建立 WebSocket 连接。
+Browser scripts establish WebSocket connections through this endpoint.
 
-连接成功消息：
+Connection success message:
 
 ```json
 {
@@ -85,7 +85,7 @@ Upgrade: websocket
 }
 ```
 
-请求消息（Worker → 浏览器）：
+Request message (Worker → Browser):
 
 ```json
 {
@@ -101,25 +101,25 @@ Upgrade: websocket
 }
 ```
 
-响应消息（浏览器 → Worker）：
+Response message (Browser → Worker):
 
 ```json
 {
   "type": "response",
   "requestId": "uuid-xxx",
-  "result": { "data": "响应数据" }
+  "result": { "data": "response data" }
 }
 ```
 
-### REST API 代理
+### REST API Proxy
 
-所有 HTTP 方法均支持：
+All HTTP methods are supported:
 
 ```http
 GET|POST|PUT|DELETE /api/{userId}/{route}
 ```
 
-请求示例：
+Request example:
 
 ```bash
 curl -X POST https://your-worker.workers.dev/api/user123/data/fetch \
@@ -127,17 +127,17 @@ curl -X POST https://your-worker.workers.dev/api/user123/data/fetch \
   -d '{"url": "https://example.com/api"}'
 ```
 
-成功响应：
+Success response:
 
 ```json
 {
   "data": {
-    "result": "浏览器执行结果"
+    "result": "browser execution result"
   }
 }
 ```
 
-错误响应（浏览器未连接）：
+Error response (browser not connected):
 
 ```json
 {
@@ -147,7 +147,7 @@ curl -X POST https://your-worker.workers.dev/api/user123/data/fetch \
 }
 ```
 
-错误响应（超时）：
+Error response (timeout):
 
 ```json
 {
@@ -157,14 +157,14 @@ curl -X POST https://your-worker.workers.dev/api/user123/data/fetch \
 }
 ```
 
-### MCP JSON-RPC 端点
+### MCP JSON-RPC Endpoint
 
 ```http
 POST /mcp/{userId}
 Content-Type: application/json
 ```
 
-初始化请求：
+Initialize request:
 
 ```json
 {
@@ -182,7 +182,7 @@ Content-Type: application/json
 }
 ```
 
-初始化响应：
+Initialize response:
 
 ```json
 {
@@ -203,7 +203,7 @@ Content-Type: application/json
 }
 ```
 
-获取工具列表：
+List tools:
 
 ```json
 {
@@ -214,7 +214,7 @@ Content-Type: application/json
 }
 ```
 
-工具列表示例响应：
+Tools list response example:
 
 ```json
 {
@@ -224,7 +224,7 @@ Content-Type: application/json
     "tools": [
       {
         "name": "fetch_page",
-        "description": "获取页面内容",
+        "description": "Fetch page content",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -238,7 +238,7 @@ Content-Type: application/json
 }
 ```
 
-调用工具：
+Call tool:
 
 ```json
 {
@@ -254,7 +254,7 @@ Content-Type: application/json
 }
 ```
 
-工具调用响应：
+Tool call response:
 
 ```json
 {
@@ -264,78 +264,78 @@ Content-Type: application/json
     "content": [
       {
         "type": "text",
-        "text": "页面内容..."
+        "text": "page content..."
       }
     ]
   }
 }
 ```
 
-## 本地开发
+## Local Development
 
 ```bash
 npx wrangler dev
 ```
 
-开发服务器启动后，默认监听 `http://localhost:8787`。
+Development server starts at `http://localhost:8787` by default.
 
-## 部署
+## Deployment
 
 ```bash
 npx wrangler deploy
 ```
 
-部署成功后会输出 Worker URL，如 `https://broxy.your-subdomain.workers.dev`。
+After successful deployment, the Worker URL will be output, e.g., `https://broxy.your-subdomain.workers.dev`.
 
-## 配置
+## Configuration
 
-`wrangler.toml` 配置说明：
+`wrangler.toml` configuration:
 
 ```toml
-name = "broxy"                    # Worker 名称
-main = "src/index.js"             # 入口文件
-compatibility_date = "2024-01-01" # 兼容性日期
+name = "broxy"                    # Worker name
+main = "src/index.js"             # Entry file
+compatibility_date = "2024-01-01" # Compatibility date
 
-# Durable Objects 绑定
+# Durable Objects binding
 [[durable_objects.bindings]]
-name = "BROWSER_CONNECTIONS"      # 绑定名称（代码中引用）
-class_name = "BrowserConnection"  # Durable Object 类名
+name = "BROWSER_CONNECTIONS"      # Binding name (referenced in code)
+class_name = "BrowserConnection"  # Durable Object class name
 
-# 迁移配置（首次部署需要）
+# Migration config (required for first deployment)
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["BrowserConnection"]
 
-# 环境变量
+# Environment variables
 [vars]
-DEFAULT_TIMEOUT = "30000"         # 请求超时时间（毫秒）
+DEFAULT_TIMEOUT = "30000"         # Request timeout (milliseconds)
 ```
 
-### 环境变量
+### Environment Variables
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `DEFAULT_TIMEOUT` | `30000` | 浏览器请求超时时间（毫秒） |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DEFAULT_TIMEOUT` | `30000` | Browser request timeout (milliseconds) |
 
-## 目录结构
+## Directory Structure
 
 ```
 worker/
 ├── src/
-│   ├── index.js         # 主入口，路由分发
-│   ├── durableObject.js # Durable Object，浏览器连接管理
-│   └── mcpHandler.js    # MCP JSON-RPC 协议处理器
-└── wrangler.toml        # Cloudflare Worker 配置
+│   ├── index.js         # Main entry, route dispatching
+│   ├── durableObject.js # Durable Object, browser connection management
+│   └── mcpHandler.js    # MCP JSON-RPC protocol handler
+└── wrangler.toml        # Cloudflare Worker configuration
 ```
 
-## 相关项目
+## Related Projects
 
-| 项目 | 说明 |
-|------|------|
-| [ext/](../ext) | 浏览器扩展/Tampermonkey 脚本 |
-| [ext-ui/](../ext-ui) | 扩展 UI（React + TypeScript） |
-| [www/](../www) | 静态落地页 |
+| Project | Description |
+|---------|-------------|
+| [ext/](../ext) | Browser extension/Tampermonkey script |
+| [ext-ui/](../ext-ui) | Extension UI (React + TypeScript) |
+| [www/](../www) | Static landing page |
 
-## 许可证
+## License
 
 MIT
