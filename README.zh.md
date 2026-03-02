@@ -332,9 +332,9 @@ worker/
 
 | 项目 | 说明 |
 |------|------|
-| [ext/](../ext) | 浏览器扩展/Tampermonkey 脚本 |
-| [ext-ui/](../ext-ui) | 扩展 UI（React + TypeScript） |
-| [www/](../www) | 静态落地页 |
+| [ext](https://github.com/broxy-dev/ext) | 浏览器扩展/Tampermonkey 脚本 |
+| [ext-ui](https://github.com/broxy-dev/ext-ui) | 扩展 UI（React + TypeScript） |
+| [www](https://github.com/broxy-dev/www) | 静态落地页 |
 
 ## 许可证
 

@@ -332,9 +332,9 @@ worker/
 
 | Project | Description |
 |---------|-------------|
-| [ext/](../ext) | Browser extension/Tampermonkey script |
-| [ext-ui/](../ext-ui) | Extension UI (React + TypeScript) |
-| [www/](../www) | Static landing page |
+| [ext](https://github.com/broxy-dev/ext) | Browser extension/Tampermonkey script |
+| [ext-ui](https://github.com/broxy-dev/ext-ui) | Extension UI (React + TypeScript) |
+| [www](https://github.com/broxy-dev/www) | Static landing page |
 
 ## License
 
