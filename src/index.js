@@ -112,6 +112,38 @@ async function handleApiCall(request, env, userId, route) {
       }, response.status || 500);
     }
     
+    // 检查是否为完整响应格式（自定义状态码/headers/body）
+    if (response.data && typeof response.data === 'object' && 
+        ('status' in response.data || 'headers' in response.data || 'body' in response.data)) {
+      const { status = 200, headers = {}, body, isBase64 } = response.data;
+      const defaultHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      };
+      // 如果没有指定 Content-Type，默认为 JSON
+      if (!headers['Content-Type'] && !headers['content-type']) {
+        defaultHeaders['Content-Type'] = 'application/json';
+      }
+      
+      // 处理响应体
+      let responseBody = body !== undefined ? body : JSON.stringify(response.data);
+      if (isBase64 && typeof body === 'string') {
+        // 将 base64 解码为 ArrayBuffer
+        const binaryString = atob(body);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        responseBody = bytes.buffer;
+      }
+      
+      return new Response(responseBody, {
+        status,
+        headers: { ...defaultHeaders, ...headers }
+      });
+    }
+    
     return jsonResponse(response.data);
     
   } catch (error) {
