@@ -7,9 +7,10 @@ Broxy backend service built on Cloudflare Worker + Durable Objects. Provides Web
 ## Features
 
 - **WebSocket Bridging** - Establish persistent connections with browser scripts for real-time communication
-- **REST API Proxy** - Proxy requests to browsers via `/api/{userId}/*` endpoint
+- **REST API Proxy** - Proxy requests to browsers via `/api/{userId}/*` endpoint with custom response format support
 - **MCP Protocol Support** - Implements MCP JSON-RPC 2.0 protocol for AI tool calling
 - **Durable Objects** - Per-user connection state management with long-lived connections and request queuing
+- **Custom Response Format** - Support for custom status codes, headers, and binary responses via base64 encoding
 
 ## Architecture
 
@@ -133,6 +134,55 @@ Success response:
 {
   "data": {
     "result": "browser execution result"
+  }
+}
+```
+
+#### Custom Response Format
+
+Browser scripts can return custom response format with status code, headers, and body:
+
+```json
+{
+  "status": 201,
+  "headers": {
+    "Content-Type": "text/plain",
+    "X-Custom-Header": "value"
+  },
+  "body": "Plain text response"
+}
+```
+
+**Return binary data (image, PDF, etc.)** using base64 encoding:
+
+```json
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "image/png"
+  },
+  "body": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "isBase64": true
+}
+```
+
+Example usage - browser script returns an image:
+
+```javascript
+// Browser script handler
+async function handleRequest(request) {
+  if (request.path === '/screenshot') {
+    const canvas = document.createElement('canvas');
+    // ... capture screenshot
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64 = dataUrl.split(',')[1];
+    
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'image/png' },
+      body: base64,
+      isBase64: true
+    };
   }
 }
 ```
@@ -339,3 +389,80 @@ worker/
 ## License
 
 MIT
+
+## Usage Examples
+
+### Complete Browser Script Example
+
+```javascript
+// Tampermonkey/extension script
+const WS_URL = 'wss://your-worker.workers.dev/connect?id=your-user-id';
+let ws;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+  
+  ws.onopen = () => console.log('Connected to Broxy');
+  
+  ws.onmessage = async (event) => {
+    const msg = JSON.parse(event.data);
+    
+    if (msg.type === 'request') {
+      const result = await handleRequest(msg.data);
+      ws.send(JSON.stringify({
+        type: 'response',
+        requestId: msg.requestId,
+        result
+      }));
+    }
+  };
+  
+  ws.onclose = () => setTimeout(connect, 3000);
+}
+
+async function handleRequest(req) {
+  // Handle different routes
+  if (req.path === '/screenshot') {
+    return await captureScreenshot();
+  }
+  
+  if (req.path === '/fetch') {
+    return await fetchData(req.body.url);
+  }
+  
+  // Default: return data as-is
+  return { path: req.path, method: req.method };
+}
+
+async function captureScreenshot() {
+  const canvas = document.createElement('canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(document.body, 0, 0);
+  
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.split(',')[1];
+  
+  return {
+    status: 200,
+    headers: { 'Content-Type': 'image/png' },
+    body: base64,
+    isBase64: true
+  };
+}
+
+connect();
+```
+
+### Call from Client
+
+```bash
+# Get screenshot
+curl https://your-worker.workers.dev/api/your-user-id/screenshot --output screenshot.png
+
+# Fetch data
+curl -X POST https://your-worker.workers.dev/api/your-user-id/fetch \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://api.example.com/data"}'
+```

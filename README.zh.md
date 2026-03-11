@@ -7,9 +7,10 @@ Broxy 后端服务，基于 Cloudflare Worker + Durable Objects 构建。提供 
 ## 功能特性
 
 - **WebSocket 桥接** - 与浏览器脚本建立持久连接，实时通信
-- **REST API 代理** - 通过 `/api/{userId}/*` 端点代理请求到浏览器执行
+- **REST API 代理** - 通过 `/api/{userId}/*` 端点代理请求到浏览器执行，支持自定义响应格式
 - **MCP 协议支持** - 实现 MCP JSON-RPC 2.0 协议，支持 AI 工具调用
 - **Durable Objects** - 每个用户独立的连接状态管理，支持长连接和请求等待
+- **自定义响应格式** - 支持自定义状态码、响应头和二进制数据（通过 base64 编码）
 
 ## 架构
 
@@ -133,6 +134,55 @@ curl -X POST https://your-worker.workers.dev/api/user123/data/fetch \
 {
   "data": {
     "result": "浏览器执行结果"
+  }
+}
+```
+
+#### 自定义响应格式
+
+浏览器脚本可以返回自定义响应格式，包含状态码、响应头和响应体：
+
+```json
+{
+  "status": 201,
+  "headers": {
+    "Content-Type": "text/plain",
+    "X-Custom-Header": "value"
+  },
+  "body": "纯文本响应"
+}
+```
+
+**返回二进制数据（图片、PDF 等）** 使用 base64 编码：
+
+```json
+{
+  "status": 200,
+  "headers": {
+    "Content-Type": "image/png"
+  },
+  "body": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "isBase64": true
+}
+```
+
+使用示例 - 浏览器脚本返回图片：
+
+```javascript
+// 浏览器脚本处理器
+async function handleRequest(request) {
+  if (request.path === '/screenshot') {
+    const canvas = document.createElement('canvas');
+    // ... 截图逻辑
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64 = dataUrl.split(',')[1];
+    
+    return {
+      status: 200,
+      headers: { 'Content-Type': 'image/png' },
+      body: base64,
+      isBase64: true
+    };
   }
 }
 ```
@@ -339,3 +389,80 @@ worker/
 ## 许可证
 
 MIT
+
+## 使用示例
+
+### 完整浏览器脚本示例
+
+```javascript
+// Tampermonkey/扩展脚本
+const WS_URL = 'wss://your-worker.workers.dev/connect?id=your-user-id';
+let ws;
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+  
+  ws.onopen = () => console.log('已连接到 Broxy');
+  
+  ws.onmessage = async (event) => {
+    const msg = JSON.parse(event.data);
+    
+    if (msg.type === 'request') {
+      const result = await handleRequest(msg.data);
+      ws.send(JSON.stringify({
+        type: 'response',
+        requestId: msg.requestId,
+        result
+      }));
+    }
+  };
+  
+  ws.onclose = () => setTimeout(connect, 3000);
+}
+
+async function handleRequest(req) {
+  // 处理不同路由
+  if (req.path === '/screenshot') {
+    return await captureScreenshot();
+  }
+  
+  if (req.path === '/fetch') {
+    return await fetchData(req.body.url);
+  }
+  
+  // 默认：原样返回数据
+  return { path: req.path, method: req.method };
+}
+
+async function captureScreenshot() {
+  const canvas = document.createElement('canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(document.body, 0, 0);
+  
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.split(',')[1];
+  
+  return {
+    status: 200,
+    headers: { 'Content-Type': 'image/png' },
+    body: base64,
+    isBase64: true
+  };
+}
+
+connect();
+```
+
+### 客户端调用
+
+```bash
+# 获取截图
+curl https://your-worker.workers.dev/api/your-user-id/screenshot --output screenshot.png
+
+# 获取数据
+curl -X POST https://your-worker.workers.dev/api/your-user-id/fetch \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://api.example.com/data"}'
+```
